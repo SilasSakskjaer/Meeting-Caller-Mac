@@ -18,7 +18,7 @@ class StopPopupController {
 
         let w = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 320, height: 140),
-            styleMask: [.titled, .closable, .nonactivatingPanel, .hudWindow],
+            styleMask: [.titled, .closable, .nonactivatingPanel, .utilityWindow, .hudWindow],
             backing: .buffered,
             defer: false
         )

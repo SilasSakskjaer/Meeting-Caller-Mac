@@ -42,7 +42,12 @@ struct SettingsView: View {
             }
 
             Section("Lys (Wiz Plug)") {
-                Toggle("Vis lys-popup ved m\u{00f8}destart", isOn: $settings.wizSyncEnabled)
+                Picker("Ved m\u{00f8}destart", selection: $settings.wizOnAction) {
+                    Text("Sp\u{00f8}rg (popup)").tag(0)
+                    Text("T\u{00e6}nd automatisk").tag(1)
+                    Text("Ingen handling").tag(2)
+                }
+                Toggle("Sluk lys n\u{00e5}r m\u{00f8}de stopper", isOn: $settings.wizOffWithMeeting)
                 HStack {
                     Text("Status:")
                     Text(meeting.wizReachable ? (meeting.wizState ? "T\u{00e6}ndt" : "Slukket") : "Ikke fundet")

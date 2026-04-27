@@ -45,17 +45,25 @@ class CameraMonitor: ObservableObject {
             self.isCameraActive = active
 
             if active && !self.wasActive {
-                // Camera just turned ON — trigger immediately
+                // Camera just turned ON — cancel any pending off-debounce, trigger immediately
                 self.debounceWorkItem?.cancel()
+                self.debounceWorkItem = nil
                 self.wasActive = true
+                print("CameraMonitor: ON detected")
                 self.onCameraOn?()
-            } else if !active && self.wasActive {
-                // Camera just turned OFF — debounce 3 seconds
-                self.debounceWorkItem?.cancel()
+            } else if !active && self.wasActive && self.debounceWorkItem == nil {
+                // Camera just turned OFF — start debounce (only once, don't reset)
+                print("CameraMonitor: OFF detected, debouncing 3s...")
                 let work = DispatchWorkItem { [weak self] in
-                    guard let self, !self.isCameraActive else { return }
-                    self.wasActive = false
-                    self.onCameraOff?()
+                    guard let self else { return }
+                    self.debounceWorkItem = nil
+                    if !self.isCameraActive {
+                        self.wasActive = false
+                        print("CameraMonitor: OFF confirmed after debounce")
+                        self.onCameraOff?()
+                    } else {
+                        print("CameraMonitor: camera came back during debounce")
+                    }
                 }
                 self.debounceWorkItem = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)

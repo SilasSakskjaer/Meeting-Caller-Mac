@@ -6,6 +6,7 @@ class CameraOffHandler: ObservableObject {
     private var cameraMonitor: CameraMonitor?
     private var settings: AppSettings?
     private var countdown = 0
+    var onMeetingStopped: (() -> Void)?
 
     func configure(meeting: MeetingService, camera: CameraMonitor, settings: AppSettings) {
         self.meetingService = meeting
@@ -14,7 +15,11 @@ class CameraOffHandler: ObservableObject {
     }
 
     func scheduleAction() {
-        guard let settings, let meetingService, meetingService.isInMeeting else { return }
+        print("scheduleAction: settings=\(settings != nil) meeting=\(meetingService != nil) inMeeting=\(meetingService?.isInMeeting ?? false) state=\(meetingService?.meetingState ?? "nil")")
+        guard let settings, let meetingService, meetingService.isInMeeting else {
+            print("scheduleAction: guard failed — skipping")
+            return
+        }
 
         timer?.invalidate()
         countdown = settings.stopDelaySeconds
@@ -48,6 +53,7 @@ class CameraOffHandler: ObservableObject {
                 switch action {
                 case 1:
                     self.meetingService?.fireAndForget { await self.meetingService!.stopMeeting() }
+                    self.onMeetingStopped?()
                     print("Auto-stopped meeting")
                 case 2:
                     if self.meetingService?.meetingState == "active" {
@@ -75,7 +81,10 @@ class CameraOffHandler: ObservableObject {
         DispatchQueue.main.async {
             StopPopupController.shared.show(
                 timeText: timeText,
-                onStop: { meetingService.fireAndForget { await meetingService.stopMeeting() } },
+                onStop: { [self] in
+                    meetingService.fireAndForget { await meetingService.stopMeeting() }
+                    self.onMeetingStopped?()
+                },
                 onPause: { meetingService.fireAndForget { await meetingService.pauseMeeting() } }
             )
         }
