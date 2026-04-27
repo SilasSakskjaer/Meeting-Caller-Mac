@@ -58,7 +58,7 @@ struct DashboardView: View {
                         HStack(spacing: 12) {
                             if meeting.isInMeeting {
                                 Button {
-                                    Task { await meeting.pauseMeeting() }
+                                    meeting.fireAndForget { await meeting.pauseMeeting() }
                                 } label: {
                                     Label(meeting.meetingState == "paused" ? "Genoptag" : "Pause",
                                           systemImage: meeting.meetingState == "paused" ? "play.fill" : "pause.fill")
@@ -67,7 +67,7 @@ struct DashboardView: View {
                                 .controlSize(.large)
 
                                 Button(role: .destructive) {
-                                    Task { await meeting.stopMeeting() }
+                                    meeting.fireAndForget { await meeting.stopMeeting() }
                                 } label: {
                                     Label("Stop", systemImage: "stop.fill")
                                         .frame(maxWidth: .infinity)
@@ -75,7 +75,7 @@ struct DashboardView: View {
                                 .controlSize(.large)
                             } else {
                                 Button {
-                                    Task { await meeting.startMeeting() }
+                                    meeting.fireAndForget { await meeting.startMeeting() }
                                 } label: {
                                     Label("Start m\u{00f8}de", systemImage: "play.fill")
                                         .frame(maxWidth: .infinity)
@@ -131,7 +131,7 @@ struct DashboardView: View {
                             }
                             Spacer()
                             Button {
-                                Task { await meeting.toggleWiz() }
+                                meeting.fireAndForget { await meeting.toggleWiz() }
                             } label: {
                                 Text(meeting.wizState ? "Sluk" : "T\u{00e6}nd")
                             }

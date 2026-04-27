@@ -1,175 +1,77 @@
 import SwiftUI
+import AppKit
 
-struct MenuBarView: View {
+struct MenuBarMenu: View {
     @EnvironmentObject var meeting: MeetingService
     @EnvironmentObject var camera: CameraMonitor
     @EnvironmentObject var settings: AppSettings
-    @Environment(\.openWindow) var openWindow
-
-    @State private var showStopConfirmation = false
-    @State private var stopTimer: Timer?
-    @State private var stopCountdown = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Status header
-            HStack {
-                Circle()
-                    .fill(meeting.isReachable ? .green : .red)
-                    .frame(width: 8, height: 8)
-                Text(meeting.deviceName)
-                    .font(.headline)
-                Spacer()
-                if meeting.isInMeeting {
-                    Text(formatDuration(meeting.meetingDuration))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+        // Status
+        Text(meeting.isReachable ? "\(meeting.deviceName)" : "Ikke forbundet")
 
-            Divider()
-
-            // Meeting state
-            HStack {
-                Image(systemName: meeting.isInMeeting ? "record.circle.fill" : "circle")
-                    .foregroundColor(meeting.isInMeeting ? .red : .secondary)
-                Text(stateText)
-                    .font(.body)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
-            // Camera status
-            HStack {
-                Image(systemName: camera.isCameraActive ? "camera.fill" : "camera")
-                    .foregroundColor(camera.isCameraActive ? .green : .secondary)
-                Text(camera.isCameraActive ? "Kamera aktivt" : "Kamera inaktivt")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                if settings.autoStartEnabled {
-                    Text("Auto")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.blue.opacity(0.2))
-                        .cornerRadius(4)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-
-            Divider()
-
-            // Meeting controls
-            if meeting.isInMeeting {
-                Button {
-                    Task { await meeting.pauseMeeting() }
-                } label: {
-                    Label(meeting.meetingState == "paused" ? "Genoptag" : "Pause",
-                          systemImage: meeting.meetingState == "paused" ? "play.fill" : "pause.fill")
-                }
-                .padding(.horizontal, 12).padding(.vertical, 4)
-
-                Button(role: .destructive) {
-                    Task { await meeting.stopMeeting() }
-                } label: {
-                    Label("Stop m\u{00f8}de", systemImage: "stop.fill")
-                }
-                .padding(.horizontal, 12).padding(.vertical, 4)
-            } else {
-                Button {
-                    Task { await meeting.startMeeting() }
-                } label: {
-                    Label("Start m\u{00f8}de", systemImage: "play.fill")
-                }
-                .disabled(!meeting.isReachable)
-                .padding(.horizontal, 12).padding(.vertical, 4)
-            }
-
-            Divider()
-
-            // Wiz light control
-            if meeting.wizReachable {
-                Button {
-                    Task { await meeting.toggleWiz() }
-                } label: {
-                    Label(meeting.wizState ? "Sluk lys" : "T\u{00e6}nd lys",
-                          systemImage: meeting.wizState ? "lightbulb.fill" : "lightbulb")
-                }
-                .padding(.horizontal, 12).padding(.vertical, 4)
-
-                Divider()
-            }
-
-            // Callers
-            if !meeting.callers.isEmpty {
-                Text("Callere")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
-
-                ForEach(meeting.callers) { caller in
-                    HStack {
-                        Circle()
-                            .fill(caller.active ? .green : .red)
-                            .frame(width: 6, height: 6)
-                        Text(caller.name)
-                            .font(.caption)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 1)
-                }
-
-                Divider()
-            }
-
-            // Bottom actions
-            Toggle("Automatisk", isOn: $settings.autoStartEnabled)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-
-            Button {
-                openWindow(id: "dashboard")
-            } label: {
-                Label("Dashboard", systemImage: "square.grid.2x2")
-            }
-            .padding(.horizontal, 12).padding(.vertical, 4)
-
-            Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                Label("Indstillinger...", systemImage: "gear")
-            }
-            .padding(.horizontal, 12).padding(.vertical, 4)
-
-            Divider()
-
-            Button("Afslut") {
-                NSApplication.shared.terminate(nil)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 4)
+        if meeting.isInMeeting {
+            Text("Møde: \(formatDuration(meeting.meetingDuration))")
         }
-        .frame(width: 260)
-        .onAppear {
-            meeting.configure(settings: settings)
-            setupCameraCallbacks()
-        }
-    }
 
-    private var stateText: String {
-        switch meeting.meetingState {
-        case "active": return "M\u{00f8}de igang"
-        case "paused": return "Pause"
-        case "incoming_call": return "Incoming call..."
-        case "idle": return "Intet m\u{00f8}de"
-        default: return meeting.isReachable ? "Klar" : "Ikke forbundet"
+        Text(camera.isCameraActive ? "📷 Kamera aktivt" : "📷 Kamera inaktivt")
+
+        Divider()
+
+        // Meeting controls
+        if meeting.isInMeeting {
+            Button(meeting.meetingState == "paused" ? "▶ Genoptag" : "⏸ Pause") {
+                meeting.fireAndForget { await meeting.pauseMeeting() }
+            }
+            Button("⏹ Stop møde") {
+                meeting.fireAndForget { await meeting.stopMeeting() }
+            }
+        } else {
+            Button("▶ Start møde") {
+                meeting.fireAndForget { await meeting.startMeeting() }
+            }
+            .disabled(!meeting.isReachable)
+        }
+
+        Divider()
+
+        // Wiz light
+        if meeting.wizReachable {
+            Button(meeting.wizState ? "💡 Sluk lys" : "💡 Tænd lys") {
+                meeting.fireAndForget { await meeting.toggleWiz() }
+            }
+            Divider()
+        }
+
+        // Callers
+        if !meeting.callers.isEmpty {
+            Text("Callere:")
+            ForEach(meeting.callers) { caller in
+                Text("  \(caller.active ? "🟢" : "🔴") \(caller.name)")
+            }
+            Divider()
+        }
+
+        // Auto toggle
+        Toggle("Automatisk", isOn: $settings.autoStartEnabled)
+
+        // Dashboard
+        Button("Dashboard") {
+            DashboardWindowController.shared.show(
+                meeting: meeting, camera: camera, settings: settings
+            )
+        }
+
+        Button("Indstillinger...") {
+            SettingsWindowController.shared.show(
+                meeting: meeting, settings: settings
+            )
+        }
+
+        Divider()
+
+        Button("Afslut") {
+            NSApplication.shared.terminate(nil)
         }
     }
 
@@ -178,47 +80,67 @@ struct MenuBarView: View {
         let s = seconds % 60
         return String(format: "%d:%02d", m, s)
     }
+}
 
-    private func setupCameraCallbacks() {
-        camera.start(
-            onCameraOn: { [self] in
-                guard settings.autoStartEnabled, !meeting.isInMeeting else { return }
-                Task {
-                    let started = await meeting.startMeeting()
-                    if started && settings.wizSyncEnabled {
-                        // Show light popup
-                        showLightPopup()
-                    }
-                }
-            },
-            onCameraOff: { [self] in
-                guard settings.autoStopEnabled, meeting.isInMeeting else { return }
-                // Wait 2 minutes then show stop confirmation
-                scheduleStopConfirmation()
-            }
-        )
-    }
+// MARK: - Window Controllers
 
-    private func showLightPopup() {
-        // Post notification for light control popup
-        NotificationCenter.default.post(name: .showLightControl, object: nil)
-    }
+class DashboardWindowController {
+    static let shared = DashboardWindowController()
+    private var window: NSWindow?
 
-    private func scheduleStopConfirmation() {
-        stopCountdown = settings.stopDelaySeconds
-        stopTimer?.invalidate()
-        stopTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [self] timer in
-            stopCountdown -= 1
-            if stopCountdown <= 0 {
-                timer.invalidate()
-                // Show stop confirmation popup
-                NotificationCenter.default.post(name: .showStopConfirmation, object: nil)
-            }
+    func show(meeting: MeetingService, camera: CameraMonitor, settings: AppSettings) {
+        if let w = window, w.isVisible {
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
         }
+        let view = DashboardView()
+            .environmentObject(meeting)
+            .environmentObject(camera)
+            .environmentObject(settings)
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered, defer: false
+        )
+        w.title = "Meeting Caller — Dashboard"
+        w.contentView = NSHostingView(rootView: view)
+        w.isReleasedWhenClosed = false
+        w.level = .floating
+        w.center()
+        NSApp.setActivationPolicy(.accessory)
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        window = w
     }
 }
 
-extension Notification.Name {
-    static let showLightControl = Notification.Name("showLightControl")
-    static let showStopConfirmation = Notification.Name("showStopConfirmation")
+class SettingsWindowController {
+    static let shared = SettingsWindowController()
+    private var window: NSWindow?
+
+    func show(meeting: MeetingService, settings: AppSettings) {
+        if let w = window, w.isVisible {
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
+        let view = SettingsView()
+            .environmentObject(meeting)
+            .environmentObject(settings)
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
+            styleMask: [.titled, .closable],
+            backing: .buffered, defer: false
+        )
+        w.title = "Meeting Caller — Indstillinger"
+        w.contentView = NSHostingView(rootView: view)
+        w.isReleasedWhenClosed = false
+        w.level = .floating
+        w.center()
+        NSApp.setActivationPolicy(.accessory)
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        window = w
+    }
 }

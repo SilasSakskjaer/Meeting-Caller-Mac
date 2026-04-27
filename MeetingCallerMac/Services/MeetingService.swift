@@ -84,7 +84,7 @@ class MeetingService: ObservableObject {
         switch meetingState {
         case "active", "incoming_call": return "record.circle.fill"
         case "paused": return "pause.circle.fill"
-        default: return isReachable ? "video.circle" : "video.circle.badge.xmark"
+        default: return isReachable ? "video.circle" : "video.slash.circle"
         }
     }
 
@@ -98,6 +98,11 @@ class MeetingService: ObservableObject {
         if settings.useMDNS {
             startMDNSDiscovery()
         }
+    }
+
+    // Fire-and-forget: runs detached so menu dismissal doesn't cancel it
+    func fireAndForget(_ action: @escaping () async -> Any?) {
+        Task.detached { _ = await action() }
     }
 
     func startPolling() {
@@ -222,15 +227,25 @@ class MeetingService: ObservableObject {
     private func post<T: Decodable>(_ path: String) async -> T? {
         guard !baseURL.isEmpty,
               let url = URL(string: baseURL + path),
-              let settings else { return nil }
+              let settings else {
+            print("POST \(path): missing baseURL or settings")
+            return nil
+        }
         var request = URLRequest(url: url, timeoutInterval: 5)
         request.httpMethod = "POST"
         request.setValue(settings.basicAuthHeader, forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "{}".data(using: .utf8)
+        print("POST \(path) → \(url) auth=\(settings.basicAuthHeader.prefix(20))...")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let body = String(data: data, encoding: .utf8) ?? ""
+            print("POST \(path) → \(code): \(body)")
+            guard code == 200 else { return nil }
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
+            print("POST \(path) error: \(error.localizedDescription)")
             return nil
         }
     }

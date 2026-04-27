@@ -3,9 +3,9 @@ import Combine
 
 class AppSettings: ObservableObject {
     @AppStorage("masterIP") var masterIP: String = ""
-    @AppStorage("password") var password: String = "admin1234"
+    @AppStorage("password") var password: String = "admin"
     @AppStorage("autoStartEnabled") var autoStartEnabled: Bool = true
-    @AppStorage("autoStopEnabled") var autoStopEnabled: Bool = true
+    @AppStorage("cameraOffAction") var cameraOffAction: Int = 0  // 0=popup, 1=stop, 2=pause
     @AppStorage("stopDelaySeconds") var stopDelaySeconds: Int = 120  // 2 minutes
     @AppStorage("wizSyncEnabled") var wizSyncEnabled: Bool = false
     @AppStorage("useMDNS") var useMDNS: Bool = true

@@ -2,32 +2,18 @@ import SwiftUI
 
 @main
 struct MeetingCallerMacApp: App {
-    @StateObject private var meetingService = MeetingService()
-    @StateObject private var cameraMonitor = CameraMonitor()
-    @StateObject private var settings = AppSettings()
+    @NSApplicationDelegateAdaptor(AppStartup.self) var appDelegate
+    private let state = AppState.shared
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView()
-                .environmentObject(meetingService)
-                .environmentObject(cameraMonitor)
-                .environmentObject(settings)
+            MenuBarMenu()
+                .environmentObject(state.meetingService)
+                .environmentObject(state.cameraMonitor)
+                .environmentObject(state.settings)
         } label: {
-            Image(systemName: meetingService.iconName)
+            Image(systemName: state.meetingService.iconName)
         }
-
-        Settings {
-            SettingsView()
-                .environmentObject(meetingService)
-                .environmentObject(settings)
-        }
-
-        Window("Dashboard", id: "dashboard") {
-            DashboardView()
-                .environmentObject(meetingService)
-                .environmentObject(cameraMonitor)
-                .environmentObject(settings)
-                .frame(minWidth: 400, minHeight: 500)
-        }
+        .menuBarExtraStyle(.menu)
     }
 }
