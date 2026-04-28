@@ -5,10 +5,20 @@ struct MenuBarMenu: View {
     @EnvironmentObject var meeting: MeetingService
     @EnvironmentObject var camera: CameraMonitor
     @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var wiz: WizService
 
     var body: some View {
         // Status
-        Text(meeting.isReachable ? "\(meeting.deviceName)" : "Ikke forbundet")
+        if meeting.isReachable && meeting.isAuthenticated {
+            Text("🟢 \(meeting.deviceName)")
+        } else if meeting.isReachable && !meeting.isAuthenticated {
+            Text("🟡 Forbundet, forkert kode")
+        } else {
+            Text("🔴 Ikke forbundet")
+        }
+        if meeting.isReachable, let ip = meeting.settings?.masterIP, !ip.isEmpty {
+            Text("    IP: \(ip)").font(.caption)
+        }
 
         if meeting.isInMeeting {
             Text("Møde: \(formatDuration(meeting.meetingDuration))")
@@ -36,10 +46,14 @@ struct MenuBarMenu: View {
         Divider()
 
         // Wiz light
-        if meeting.wizReachable {
-            Button(meeting.wizState ? "💡 Sluk lys" : "💡 Tænd lys") {
-                meeting.fireAndForget { await meeting.toggleWiz() }
+        if wiz.reachable {
+            Text(wiz.state ? "💡 Lys: Tændt" : "💡 Lys: Slukket")
+            Button(wiz.state ? "Sluk lys" : "Tænd lys") {
+                wiz.toggle()
             }
+            Divider()
+        } else if !settings.wizIP.isEmpty {
+            Text("💡 Lys: Ikke fundet")
             Divider()
         }
 
@@ -58,13 +72,13 @@ struct MenuBarMenu: View {
         // Dashboard
         Button("Dashboard") {
             DashboardWindowController.shared.show(
-                meeting: meeting, camera: camera, settings: settings
+                meeting: meeting, camera: camera, settings: settings, wiz: wiz
             )
         }
 
         Button("Indstillinger...") {
             SettingsWindowController.shared.show(
-                meeting: meeting, settings: settings
+                meeting: meeting, settings: settings, wiz: wiz
             )
         }
 
@@ -88,7 +102,7 @@ class DashboardWindowController {
     static let shared = DashboardWindowController()
     private var window: NSWindow?
 
-    func show(meeting: MeetingService, camera: CameraMonitor, settings: AppSettings) {
+    func show(meeting: MeetingService, camera: CameraMonitor, settings: AppSettings, wiz: WizService? = nil) {
         if let w = window, w.isVisible {
             w.makeKeyAndOrderFront(nil)
             NSApp.activate()
@@ -98,6 +112,7 @@ class DashboardWindowController {
             .environmentObject(meeting)
             .environmentObject(camera)
             .environmentObject(settings)
+            .environmentObject(wiz ?? AppState.shared.wizService)
         let w = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 600),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -119,7 +134,7 @@ class SettingsWindowController {
     static let shared = SettingsWindowController()
     private var window: NSWindow?
 
-    func show(meeting: MeetingService, settings: AppSettings) {
+    func show(meeting: MeetingService, settings: AppSettings, wiz: WizService? = nil) {
         if let w = window, w.isVisible {
             w.makeKeyAndOrderFront(nil)
             NSApp.activate()
@@ -128,6 +143,7 @@ class SettingsWindowController {
         let view = SettingsView()
             .environmentObject(meeting)
             .environmentObject(settings)
+            .environmentObject(wiz ?? AppState.shared.wizService)
         let w = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
             styleMask: [.titled, .closable],

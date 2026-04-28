@@ -11,6 +11,7 @@ struct MeetingCallerMacApp: App {
                 .environmentObject(state.meetingService)
                 .environmentObject(state.cameraMonitor)
                 .environmentObject(state.settings)
+                .environmentObject(state.wizService)
         } label: {
             Image(systemName: state.meetingService.iconName)
         }

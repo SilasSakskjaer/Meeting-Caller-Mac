@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var meeting: MeetingService
     @EnvironmentObject var camera: CameraMonitor
     @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var wiz: WizService
 
     var body: some View {
         ScrollView {
@@ -119,23 +120,23 @@ struct DashboardView: View {
                 GroupBox("Lys (Wiz Plug)") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Image(systemName: meeting.wizState ? "lightbulb.fill" : "lightbulb")
+                            Image(systemName: wiz.state ? "lightbulb.fill" : "lightbulb")
                                 .font(.title2)
-                                .foregroundColor(meeting.wizState ? .yellow : .secondary)
+                                .foregroundColor(wiz.state ? .yellow : .secondary)
                             VStack(alignment: .leading) {
-                                Text(meeting.wizState ? "T\u{00e6}ndt" : "Slukket")
+                                Text(wiz.state ? "T\u{00e6}ndt" : "Slukket")
                                     .font(.body)
-                                Text(meeting.wizReachable ? "Tilsluttet" : "Ikke fundet")
+                                Text(wiz.reachable ? "Tilsluttet" : "Ikke fundet")
                                     .font(.caption)
-                                    .foregroundColor(meeting.wizReachable ? .green : .red)
+                                    .foregroundColor(wiz.reachable ? .green : .red)
                             }
                             Spacer()
                             Button {
-                                meeting.fireAndForget { await meeting.toggleWiz() }
+                                wiz.toggle()
                             } label: {
-                                Text(meeting.wizState ? "Sluk" : "T\u{00e6}nd")
+                                Text(wiz.state ? "Sluk" : "T\u{00e6}nd")
                             }
-                            .disabled(!meeting.wizReachable)
+                            .disabled(!wiz.reachable)
                         }
                     }
                     .padding(4)

@@ -7,6 +7,7 @@ class AppSettings: ObservableObject {
     @AppStorage("autoStartEnabled") var autoStartEnabled: Bool = true
     @AppStorage("cameraOffAction") var cameraOffAction: Int = 0  // 0=popup, 1=stop, 2=pause
     @AppStorage("stopDelaySeconds") var stopDelaySeconds: Int = 120  // 2 minutes
+    @AppStorage("wizIP") var wizIP: String = ""
     @AppStorage("wizOnAction") var wizOnAction: Int = 0  // 0=spørg, 1=auto tænd, 2=manual
     @AppStorage("wizOffWithMeeting") var wizOffWithMeeting: Bool = true  // Sluk lys når møde stopper
     @AppStorage("useMDNS") var useMDNS: Bool = true

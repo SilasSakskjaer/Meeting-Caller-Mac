@@ -1,6 +1,5 @@
 import SwiftUI
 import Combine
-import Network
 
 struct MeetingStatus: Codable {
     let state: String
@@ -49,36 +48,26 @@ struct CallerStatus: Codable, Identifiable {
     var id: String { name }
 }
 
-struct WizStatus: Codable {
-    let ok: Bool
-    let state: Bool
-    let reachable: Bool
-    let ip: String
-}
-
 struct APIResponse: Codable {
     let ok: Bool
     let action: String?
     let reason: String?
-    let state: Bool?  // For wiz toggle
 }
 
 class MeetingService: ObservableObject {
     @Published var meetingState: String = "unknown"
     @Published var meetingDuration: Int = 0
     @Published var isReachable: Bool = false
+    @Published var isAuthenticated: Bool = false
     @Published var deviceName: String = "?"
     @Published var callers: [CallerStatus] = []
     @Published var callerCount: Int = 0
-    @Published var wizState: Bool = false
-    @Published var wizReachable: Bool = false
     @Published var firmware: String = ""
     @Published var uptime: Int = 0
 
     private var pollTimer: Timer?
-    private var settings: AppSettings?
-    private var mdnsBrowser: NWBrowser?
-    private var discoveredIP: String?
+    private(set) var settings: AppSettings?
+    private(set) var discoveryService: DiscoveryService?
 
     var iconName: String {
         switch meetingState {
@@ -96,7 +85,7 @@ class MeetingService: ObservableObject {
         self.settings = settings
         startPolling()
         if settings.useMDNS {
-            startMDNSDiscovery()
+            startDiscovery()
         }
     }
 
@@ -135,33 +124,20 @@ class MeetingService: ObservableObject {
         return resp.ok
     }
 
-    // MARK: - Wiz Control
-
-    func toggleWiz() async -> Bool? {
-        guard let resp: APIResponse = await post("/api/wiz/toggle") else { return nil }
-        if resp.ok {
-            await MainActor.run { wizState = resp.state ?? !wizState }
-        }
-        return resp.state
-    }
-
-    func pollWizStatus() async {
-        guard let status: WizStatus = await get("/api/wiz/status") else { return }
-        await MainActor.run {
-            wizState = status.state
-            wizReachable = status.reachable
-        }
-    }
-
     // MARK: - Status Polling
 
     func pollStatus() async {
         guard let status: DeviceStatus = await get("/api/status") else {
-            await MainActor.run { isReachable = false }
+            await MainActor.run {
+                isReachable = false
+                isAuthenticated = false
+            }
             return
         }
+        let authOk = await checkAuth()
         await MainActor.run {
             isReachable = true
+            isAuthenticated = authOk
             meetingState = status.meetingState
             meetingDuration = status.meetingDuration
             deviceName = status.deviceName
@@ -170,40 +146,43 @@ class MeetingService: ObservableObject {
             firmware = status.firmware
             uptime = status.uptime
         }
-        await pollWizStatus()
     }
 
-    // MARK: - mDNS Discovery
+    private func checkAuth() async -> Bool {
+        guard !baseURL.isEmpty,
+              let url = URL(string: baseURL + "/api/auth/check"),
+              let settings else { return false }
+        var request = URLRequest(url: url, timeoutInterval: 3)
+        request.setValue(settings.basicAuthHeader, forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return false }
+            struct AuthCheck: Decodable { let authenticated: Bool }
+            let result = try JSONDecoder().decode(AuthCheck.self, from: data)
+            return result.authenticated
+        } catch {
+            return false
+        }
+    }
 
-    func startMDNSDiscovery() {
-        let params = NWBrowser.Descriptor.bonjour(type: "_meeting-master._tcp", domain: nil)
-        mdnsBrowser = NWBrowser(for: params, using: .tcp)
-        mdnsBrowser?.browseResultsChangedHandler = { [weak self] results, _ in
-            for result in results {
-                if case .service(_, _, _, _) = result.endpoint {
-                    // Resolve the service to get IP
-                    let connection = NWConnection(to: result.endpoint, using: .tcp)
-                    connection.stateUpdateHandler = { state in
-                        if case .ready = state {
-                            if let path = connection.currentPath,
-                               let endpoint = path.remoteEndpoint,
-                               case .hostPort(let host, _) = endpoint {
-                                let ip = "\(host)"
-                                DispatchQueue.main.async {
-                                    self?.discoveredIP = ip
-                                    if self?.settings?.masterIP.isEmpty == true {
-                                        self?.settings?.masterIP = ip
-                                    }
-                                }
-                            }
-                            connection.cancel()
-                        }
-                    }
-                    connection.start(queue: .global())
+    // MARK: - Discovery
+
+    func startDiscovery() {
+        discoveryService?.stop()
+        discoveryService = DiscoveryService { [weak self] ip in
+            DispatchQueue.main.async {
+                print("Discovery: found master at \(ip)")
+                if self?.settings?.masterIP.isEmpty == true || self?.settings?.useMDNS == true {
+                    self?.settings?.masterIP = ip
                 }
             }
         }
-        mdnsBrowser?.start(queue: .global())
+        discoveryService?.start()
+    }
+
+    func stopDiscovery() {
+        discoveryService?.stop()
+        discoveryService = nil
     }
 
     // MARK: - Network
